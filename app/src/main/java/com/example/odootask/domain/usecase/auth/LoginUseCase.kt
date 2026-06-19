@@ -8,13 +8,12 @@ class LoginUseCase @Inject constructor(
     private val repository: AuthRepository,
 ) {
     suspend operator fun invoke(
-        database: String,
         username: String,
         password: String,
     ): Result<OdooUser> {
-        if (database.isBlank() || username.isBlank() || password.isBlank()) {
+        if (username.isBlank() || password.isBlank()) {
             return Result.failure(IllegalArgumentException("All fields are required"))
         }
-        return repository.login(database.trim(), username.trim(), password)
+        return repository.login(username.trim(), password)
     }
 }

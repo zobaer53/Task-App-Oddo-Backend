@@ -15,5 +15,5 @@ import retrofit2.http.POST
 interface OdooApiService {
 
     @POST("jsonrpc")
-    suspend fun callJsonRpc(@Body body: OdooRequest<Any>): OdooResponse<JsonElement>
+    suspend fun callJsonRpc(@Body body: OdooRequest): OdooResponse<JsonElement>
 }

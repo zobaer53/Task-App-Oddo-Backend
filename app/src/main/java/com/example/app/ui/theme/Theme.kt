@@ -17,15 +17,21 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
+    primary = BrandPurple,
+    onPrimary = androidx.compose.ui.graphics.Color.White,
+    primaryContainer = BrandPurpleLight,
+    onPrimaryContainer = BrandPurpleDark,
+    secondary = BrandPurpleDark,
     tertiary = Pink40,
+    background = ScreenBackground,
+    surface = androidx.compose.ui.graphics.Color.White,
+    error = ErrorRed,
 )
 
 @Composable
 fun AppTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val colorScheme = when {
