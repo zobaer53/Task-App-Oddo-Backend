@@ -1,9 +1,22 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.ksp)
     alias(libs.plugins.hilt.android)
 }
+
+// Load local.properties
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(FileInputStream(localPropertiesFile))
+}
+
+val odooBaseUrl = localProperties.getProperty("ODOO_BASE_URL", "https://zobaer.odoo.com/")
+val odooDatabase = localProperties.getProperty("ODOO_DATABASE", "zobaer")
 
 android {
     namespace = "com.example.odootask"
@@ -18,12 +31,14 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8069/\"")
+        buildConfigField("String", "API_BASE_URL", "\"$odooBaseUrl\"")
+        buildConfigField("String", "ODOO_DATABASE", "\"$odooDatabase\"")
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
