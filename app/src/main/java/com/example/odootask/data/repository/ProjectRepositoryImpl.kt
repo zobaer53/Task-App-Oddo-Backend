@@ -32,7 +32,8 @@ class ProjectRepositoryImpl @Inject constructor(
         val args = listOf(
             s.database, s.uid, s.password,
             "project.project", "search_read",
-            listOf(emptyList<Any>(), mapOf("fields" to listOf("id", "name"))),
+            listOf(emptyList<Any>()), // positional args: [domain]
+            mapOf("fields" to listOf("id", "name")), // kwargs
         )
         val resp = api.callJsonRpc(OdooRequest(params = ObjectParams(args = args)))
         val el = resp.result ?: throw RuntimeException(resp.error?.data?.message ?: "Failed to load projects")
@@ -45,7 +46,8 @@ class ProjectRepositoryImpl @Inject constructor(
         val args = listOf(
             s.database, s.uid, s.password,
             "project.task.type", "search_read",
-            listOf(emptyList<Any>(), mapOf("fields" to listOf("id", "name"))),
+            listOf(emptyList<Any>()), // positional args: [domain]
+            mapOf("fields" to listOf("id", "name")), // kwargs
         )
         val resp = api.callJsonRpc(OdooRequest(params = ObjectParams(args = args)))
         val el = resp.result ?: throw RuntimeException(resp.error?.data?.message ?: "Failed to load stages")

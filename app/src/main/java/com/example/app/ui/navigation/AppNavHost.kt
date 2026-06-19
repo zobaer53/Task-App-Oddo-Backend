@@ -16,6 +16,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.odootask.feature.auth.LoginScreen
+import com.example.odootask.feature.tasks.TasksScreen
 
 @Composable
 fun AppNavHost(
@@ -49,8 +50,29 @@ fun AppNavHost(
                 }
 
                 composable(Routes.TASKS) {
-                    // Replaced by TasksScreen in phase 9.
-                    PlaceholderScreen(label = "Tasks")
+                    TasksScreen(
+                        onNavigateToTaskDetail = { taskId ->
+                            navController.navigate(Routes.taskDetail(taskId))
+                        },
+                        onNavigateToCreateTask = {
+                            navController.navigate(Routes.CREATE_TASK)
+                        },
+                        onNavigateToLogin = {
+                            navController.navigate(Routes.LOGIN) {
+                                popUpTo(Routes.TASKS) { inclusive = true }
+                            }
+                        },
+                    )
+                }
+
+                composable(Routes.TASK_DETAIL) {
+                    // Replaced by TaskDetailScreen in phase 10.
+                    PlaceholderScreen(label = "Task Detail")
+                }
+
+                composable(Routes.CREATE_TASK) {
+                    // Replaced by CreateTaskScreen in phase 11.
+                    PlaceholderScreen(label = "Create Task")
                 }
             }
         }

@@ -37,7 +37,8 @@ class TaskRepositoryImpl @Inject constructor(
         val args = listOf(
             s.database, s.uid, s.password,
             "project.task", "search_read",
-            listOf(emptyList<Any>(), mapOf("fields" to taskFields, "limit" to 80)),
+            listOf(emptyList<Any>()), // positional args: [domain]
+            mapOf("fields" to taskFields, "limit" to 80), // kwargs
         )
         val resp = api.callJsonRpc(OdooRequest(params = ObjectParams(args = args)))
         val el = resp.result ?: throw RuntimeException(resp.error?.data?.message ?: "Failed to load tasks")
@@ -83,7 +84,8 @@ class TaskRepositoryImpl @Inject constructor(
         val readArgs = listOf(
             s.database, s.uid, s.password,
             "project.task", "read",
-            listOf(listOf(taskId), mapOf("fields" to taskFields)),
+            listOf(listOf(taskId)), // positional args: [ids]
+            mapOf("fields" to taskFields), // kwargs
         )
         val readResp = api.callJsonRpc(OdooRequest(params = ObjectParams(args = readArgs)))
         readResp.result?.let { el ->
