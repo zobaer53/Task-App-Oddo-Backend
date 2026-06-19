@@ -3,7 +3,7 @@ package com.example.odootask.data.di
 import android.content.Context
 import androidx.room.Room
 import com.example.odootask.data.local.AppDatabase
-import com.example.odootask.data.local.dao.ItemDao
+import com.example.odootask.data.local.dao.TaskDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -28,5 +28,5 @@ object DatabaseModule {
             .build()
 
     @Provides
-    fun provideItemDao(db: AppDatabase): ItemDao = db.itemDao()
+    fun provideTaskDao(db: AppDatabase): TaskDao = db.taskDao()
 }

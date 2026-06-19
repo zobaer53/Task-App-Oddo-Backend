@@ -7,8 +7,11 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import javax.inject.Inject
+import javax.inject.Singleton
 
 private val Context.sessionStore: DataStore<Preferences> by preferencesDataStore(name = "odoo_session")
 
@@ -17,7 +20,10 @@ private val Context.sessionStore: DataStore<Preferences> by preferencesDataStore
  * `BuildConfig.API_BASE_URL` and never stored here. [getSession] emits `null`
  * while logged out — i.e. when no uid has been saved or it is `0`.
  */
-class SessionDataStore(private val context: Context) {
+@Singleton
+class SessionDataStore @Inject constructor(
+    @ApplicationContext private val context: Context,
+) {
 
     fun getSession(): Flow<SessionData?> = context.sessionStore.data.map { prefs ->
         val uid = prefs[KEY_UID] ?: 0

@@ -1,7 +1,7 @@
 package com.example.odootask.data.di
 
 import com.example.odootask.BuildConfig
-import com.example.odootask.data.network.ApiService
+import com.example.odootask.data.remote.OdooApiService
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import dagger.Module
@@ -56,6 +56,6 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideApiService(retrofit: Retrofit): ApiService =
-        retrofit.create(ApiService::class.java)
+    fun provideOdooApiService(retrofit: Retrofit): OdooApiService =
+        retrofit.create(OdooApiService::class.java)
 }
