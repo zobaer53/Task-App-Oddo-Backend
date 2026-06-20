@@ -7,7 +7,8 @@ import com.example.odootask.domain.model.Task
 
 data class TasksUiState(
     val tasks: List<Task> = emptyList(),
-    val username: String = "",
+    val name: String = "",
+    val email: String = "",
     val isLoading: Boolean = false,
     val isRefreshing: Boolean = false,
     val errorMessage: String? = null,
@@ -17,7 +18,9 @@ sealed interface TasksUiEvent : MviUiEvent {
     data object Appeared : TasksUiEvent
     data object RefreshPulled : TasksUiEvent
     data class TaskClicked(val taskId: Int) : TasksUiEvent
+    data class TaskDeleted(val taskId: Int) : TasksUiEvent
     data object CreateTaskClicked : TasksUiEvent
+    data object UpdateAccountClicked : TasksUiEvent
     data object LogoutClicked : TasksUiEvent
     data object ErrorDismissed : TasksUiEvent
 }
@@ -25,6 +28,7 @@ sealed interface TasksUiEvent : MviUiEvent {
 sealed interface TasksUiEffect : MviUiEffect {
     data class NavigateToTaskDetail(val taskId: Int) : TasksUiEffect
     data object NavigateToCreateTask : TasksUiEffect
+    data object NavigateToUpdateAccount : TasksUiEffect
     data object NavigateToLogin : TasksUiEffect
     data class ShowSnackbar(val message: String) : TasksUiEffect
 }

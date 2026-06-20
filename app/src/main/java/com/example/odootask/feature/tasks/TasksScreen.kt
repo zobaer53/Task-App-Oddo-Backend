@@ -18,9 +18,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -29,16 +34,22 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -54,6 +65,7 @@ import java.time.format.DateTimeFormatter
 fun TasksScreen(
     onNavigateToTaskDetail: (Int) -> Unit,
     onNavigateToCreateTask: () -> Unit,
+    onNavigateToUpdateAccount: () -> Unit,
     onNavigateToLogin: () -> Unit,
     viewModel: TasksViewModel = hiltViewModel(),
 ) {
@@ -66,6 +78,7 @@ fun TasksScreen(
         when (effect) {
             is TasksUiEffect.NavigateToTaskDetail -> onNavigateToTaskDetail(effect.taskId)
             TasksUiEffect.NavigateToCreateTask -> onNavigateToCreateTask()
+            TasksUiEffect.NavigateToUpdateAccount -> onNavigateToUpdateAccount()
             TasksUiEffect.NavigateToLogin -> onNavigateToLogin()
             is TasksUiEffect.ShowSnackbar -> snackbarHostState.showSnackbar(effect.message)
         }
@@ -102,14 +115,7 @@ private fun TasksContent(
                         )
                     }
                 },
-                actions = {
-                    IconButton(onClick = { onEvent(TasksUiEvent.LogoutClicked) }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Logout,
-                            contentDescription = "Log out",
-                        )
-                    }
-                },
+                actions = { OverflowMenu(onEvent = onEvent) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = Color.White,
@@ -148,28 +154,131 @@ private fun TasksContent(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         item {
-                            Text(
-                                text = greeting(state.username),
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(bottom = 4.dp),
-                            )
+                            Column(modifier = Modifier.padding(bottom = 4.dp)) {
+                                Text(
+                                    text = greeting(state.name),
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                if (state.email.isNotBlank()) {
+                                    Text(
+                                        text = state.email,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(top = 2.dp),
+                                    )
+                                }
+                            }
                         }
 
                         if (state.tasks.isEmpty()) {
                             item { EmptyState() }
                         } else {
                             items(state.tasks, key = { it.id }) { task ->
-                                TaskCard(
-                                    task = task,
-                                    onClick = { onEvent(TasksUiEvent.TaskClicked(task.id)) },
-                                )
+                                SwipeToDeleteContainer(
+                                    onDelete = { onEvent(TasksUiEvent.TaskDeleted(task.id)) },
+                                ) {
+                                    TaskCard(
+                                        task = task,
+                                        onClick = { onEvent(TasksUiEvent.TaskClicked(task.id)) },
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+/** Three-dot overflow menu in the top bar: update account and logout. */
+@Composable
+private fun OverflowMenu(onEvent: (TasksUiEvent) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+
+    IconButton(onClick = { expanded = true }) {
+        Icon(imageVector = Icons.Filled.MoreVert, contentDescription = "More options")
+    }
+    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenuItem(
+            text = { Text("Update Account") },
+            onClick = {
+                expanded = false
+                onEvent(TasksUiEvent.UpdateAccountClicked)
+            },
+            leadingIcon = {
+                Icon(imageVector = Icons.Filled.Person, contentDescription = null)
+            },
+        )
+        DropdownMenuItem(
+            text = { Text("Log out") },
+            onClick = {
+                expanded = false
+                onEvent(TasksUiEvent.LogoutClicked)
+            },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Logout,
+                    contentDescription = null,
+                )
+            },
+        )
+    }
+}
+
+/**
+ * Wraps content in a swipe-to-dismiss gesture (swipe either direction) that fires
+ * [onDelete]. The item is removed from state once the delete lands in the cache, so we
+ * leave the box settled and let the list recompose rather than holding a dismissed state.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeToDeleteContainer(
+    onDelete: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    // confirmValueChange can fire more than once per swipe; guard so the delete (and its
+    // network unlink) runs only once, otherwise the second call hits a gone record.
+    var deleted by remember { mutableStateOf(false) }
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value != SwipeToDismissBoxValue.Settled && !deleted) {
+                deleted = true
+                onDelete()
+            }
+            // Don't latch the dismissed state; the row disappears via the data update.
+            false
+        },
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        backgroundContent = { SwipeDeleteBackground(dismissState.dismissDirection) },
+        content = { content() },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeDeleteBackground(direction: SwipeToDismissBoxValue) {
+    val alignment = when (direction) {
+        SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
+        else -> Alignment.CenterEnd
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.errorContainer)
+            .padding(horizontal = 24.dp),
+        contentAlignment = alignment,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Delete,
+            contentDescription = "Delete task",
+            tint = MaterialTheme.colorScheme.onErrorContainer,
+        )
     }
 }
 
@@ -253,8 +362,8 @@ private fun EmptyState() {
     }
 }
 
-private fun greeting(username: String): String =
-    if (username.isBlank()) "Welcome!" else "Welcome, $username!"
+private fun greeting(name: String): String =
+    if (name.isBlank()) "Welcome!" else "Welcome, $name!"
 
 /** Background + foreground colors for the stage badge, keyed loosely on the stage name. */
 private fun stageColors(stageName: String): Pair<Color, Color> {

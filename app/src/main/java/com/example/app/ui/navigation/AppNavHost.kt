@@ -15,6 +15,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.odootask.feature.account.UpdateAccountScreen
 import com.example.odootask.feature.auth.LoginScreen
 import com.example.odootask.feature.task_create.CreateTaskScreen
 import com.example.odootask.feature.task_detail.TaskDetailScreen
@@ -59,6 +60,9 @@ fun AppNavHost(
                         onNavigateToCreateTask = {
                             navController.navigate(Routes.CREATE_TASK)
                         },
+                        onNavigateToUpdateAccount = {
+                            navController.navigate(Routes.UPDATE_ACCOUNT)
+                        },
                         onNavigateToLogin = {
                             navController.navigate(Routes.LOGIN) {
                                 popUpTo(Routes.TASKS) { inclusive = true }
@@ -78,6 +82,12 @@ fun AppNavHost(
 
                 composable(Routes.CREATE_TASK) {
                     CreateTaskScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                    )
+                }
+
+                composable(Routes.UPDATE_ACCOUNT) {
+                    UpdateAccountScreen(
                         onNavigateBack = { navController.popBackStack() },
                     )
                 }

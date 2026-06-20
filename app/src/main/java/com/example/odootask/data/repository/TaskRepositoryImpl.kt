@@ -114,6 +114,20 @@ class TaskRepositoryImpl @Inject constructor(
         cacheTask(s, taskId)
     }
 
+    override suspend fun deleteTask(taskId: Int): Result<Unit> = runCatching {
+        val s = requireSession()
+        val unlinkArgs = listOf(
+            s.database, s.uid, s.password,
+            "project.task", "unlink",
+            listOf(listOf(taskId)), // positional args: [ids]
+        )
+        val resp = api.callJsonRpc(OdooRequest(params = ObjectParams(args = unlinkArgs)))
+        resp.result ?: throw RuntimeException(resp.error?.data?.message ?: "Failed to delete task")
+
+        // Drop the row from the cache so the reactive list removes it without a refresh.
+        taskDao.deleteById(taskId)
+    }
+
     private suspend fun requireSession(): SessionData =
         sessionDataStore.getSession().first() ?: throw IllegalStateException("Not logged in")
 }

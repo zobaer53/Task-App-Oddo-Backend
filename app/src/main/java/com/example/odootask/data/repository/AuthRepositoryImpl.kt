@@ -7,10 +7,12 @@ import com.example.odootask.BuildConfig
 import com.example.odootask.data.remote.OdooApiService
 import com.example.odootask.data.remote.dto.CommonParams
 import com.example.odootask.data.remote.dto.DbParams
+import com.example.odootask.data.remote.dto.ObjectParams
 import com.example.odootask.data.remote.dto.OdooRequest
 import com.example.odootask.domain.model.OdooUser
 import com.example.odootask.domain.repository.AuthRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -82,10 +84,44 @@ class AuthRepositoryImpl @Inject constructor(
         }.getOrDefault(configured)
     }
 
+    override suspend fun getAccountName(): Result<String> = runCatching {
+        val s = requireSession()
+        val args = listOf(
+            s.database, s.uid, s.password,
+            "res.users", "read",
+            listOf(listOf(s.uid)), // positional args: [ids]
+            mapOf("fields" to listOf("name")), // kwargs
+        )
+        val resp = api.callJsonRpc(OdooRequest(params = ObjectParams(args = args)))
+        val result = resp.result
+            ?: throw RuntimeException(resp.error?.data?.message ?: resp.error?.message ?: "Failed to load account")
+
+        // `read` returns an array of records; pull "name" off the first row.
+        val record = result.takeIf { it.isJsonArray }?.asJsonArray?.firstOrNull()?.asJsonObject
+            ?: throw RuntimeException("Account not found")
+        record.get("name")?.takeIf { it.isJsonPrimitive }?.asString.orEmpty()
+    }
+
+    override suspend fun updateAccountName(name: String): Result<Unit> = runCatching {
+        val s = requireSession()
+        val args = listOf(
+            s.database, s.uid, s.password,
+            "res.users", "write",
+            listOf(listOf(s.uid), mapOf("name" to name)),
+        )
+        val resp = api.callJsonRpc(OdooRequest(params = ObjectParams(args = args)))
+        resp.result
+            ?: throw RuntimeException(resp.error?.data?.message ?: resp.error?.message ?: "Failed to update account")
+        Unit
+    }
+
     override suspend fun logout() {
         sessionDataStore.clearSession()
         taskDao.clear()
     }
+
+    private suspend fun requireSession(): SessionData =
+        sessionDataStore.getSession().first() ?: throw IllegalStateException("Not logged in")
 
     override fun getSession(): Flow<OdooUser?> = sessionDataStore.getSession().map { session ->
         session?.let {

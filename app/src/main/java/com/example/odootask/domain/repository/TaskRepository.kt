@@ -15,4 +15,5 @@ interface TaskRepository {
         userIds: List<Int>,
     ): Result<Int>
     suspend fun updateTaskStage(taskId: Int, stageId: Int): Result<Unit>
+    suspend fun deleteTask(taskId: Int): Result<Unit>
 }

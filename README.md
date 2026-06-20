@@ -1,198 +1,195 @@
-# Android MVI + Clean Architecture Boilerplate
+# Odoo Tasks
 
-Copy this folder, rename `com.example.app` everywhere, and you have a fully wired project.
+An Android client for managing project tasks in an [Odoo](https://www.odoo.com/) ERP
+instance. The app authenticates against an Odoo server over JSON-RPC and lets the user
+view, create, and update the status of their project tasks from their phone.
 
----
-
-## What's included
-
-| Layer | Files |
-|---|---|
-| MVI core | `core/mvi/MviViewModel`, `MviContract`, `CollectEffect` |
-| Domain | `domain/model/Item`, `domain/repository/ItemRepository`, `domain/usecase/GetItemsUseCase` |
-| Data | `data/repository/ItemRepositoryImpl`, `data/network/ApiService`, `data/network/dto/ItemDto` |
-| Local DB | `data/local/AppDatabase`, `data/local/entity/ItemEntity`, `data/local/dao/ItemDao`, `data/local/migration/Migrations` |
-| DI | `data/di/NetworkModule`, `data/di/DatabaseModule`, `data/di/RepositoryModule` |
-| Feature | `feature/items/ItemsContract`, `ItemsViewModel`, `ItemsScreen` |
-| UI | `ui/navigation/AppNavHost`, `ui/navigation/Routes`, `ui/theme/AppTheme` |
-| App | `MainActivity`, `MyApplication` |
+Built with **Kotlin**, **Jetpack Compose**, and a strict **Clean Architecture + MVI**
+setup.
 
 ---
 
-## Quick-start checklist
+## Features
 
-1. **Rename package**: replace `com.example.app` with your package in all files and `app/build.gradle.kts`.
-2. **Set `applicationId`** in `app/build.gradle.kts`.
-3. **Set `rootProject.name`** in `settings.gradle.kts`.
-4. **Add `API_BASE_URL`** to `BuildConfig` (see `app/build.gradle.kts` comment).
-5. **Run** `./gradlew installDebug` — the project compiles and shows a list screen backed by Room.
+- **Login** against an Odoo database with username/password (credentials persisted for
+  auto-login on next launch).
+- **Task list** with pull-to-refresh, a personalised greeting, and per-task status chips.
+- **Swipe to delete** — remove a task by swiping its row.
+- **Create task** — title, description, and a due-date picker.
+- **Update task status** — move a task between the project's shared stages.
+- **Account** — view and update the logged-in user's account name, plus logout.
 
 ---
 
-## Architecture diagram
+## Project setup
 
-```
-UI (Composable Screen)
-    │  collectAsStateWithLifecycle()
-    │  CollectEffect { effect -> ... }
-    ▼
-ViewModel : MviViewModel<State, Event, Effect>
-    │  onEvent(event)  →  updateState { ... }  /  sendEffect(...)
-    ▼
-Use Case  (optional thin layer, great for reuse / testing)
-    ▼
-Repository Interface  (domain — no Android deps)
-    ▼
-RepositoryImpl  (data — Room + Retrofit)
-    ├── Local: Room DAO  →  Flow<List<Entity>>
-    └── Remote: Retrofit ApiService
+### Prerequisites
+
+- Android Studio (Ladybug or newer) / JDK 11+
+- An accessible Odoo server and a database you can log into.
+
+### 1. Clone & open
+
+```bash
+git clone <repo-url>
+cd "practical Test - Android"
 ```
 
----
+Open the folder in Android Studio and let it sync Gradle.
 
-## MVI pattern
+### 2. Configure your Odoo instance
 
-### Contract file (`{Feature}Contract.kt`)
-```kotlin
-data class FooUiState(val items: List<Item> = emptyList()) : MviUiState
+The Odoo server URL and default database are read from `local.properties` (which is **not**
+committed) and exposed to the app through `BuildConfig`. Add these lines to
+`local.properties` in the project root:
 
-sealed interface FooUiEvent : MviUiEvent {
-    data object Appeared : FooUiEvent
-    data class ItemClicked(val id: String) : FooUiEvent
-}
-
-sealed interface FooUiEffect : MviUiEffect {
-    data class NavigateToDetail(val id: String) : FooUiEffect
-    data class ShowSnackbar(val message: String) : FooUiEffect
-}
+```properties
+ODOO_BASE_URL=https://your-instance.odoo.com/
+ODOO_DATABASE=your_database_name
 ```
 
-### ViewModel
-```kotlin
-@HiltViewModel
-class FooViewModel @Inject constructor(
-    private val getItems: GetItemsUseCase,
-) : MviViewModel<FooUiState, FooUiEvent, FooUiEffect>(FooUiState()) {
+If omitted, the build falls back to the defaults declared in
+[app/build.gradle.kts](app/build.gradle.kts) (`buildConfigField "API_BASE_URL"` /
+`"ODOO_DATABASE"`). The database can also be typed on the login screen.
 
-    init {
-        getItems()
-            .onEach { items -> updateState { copy(items = items) } }
-            .launchIn(viewModelScope)
-    }
+> The URL is used as the Retrofit base URL; the app calls the standard Odoo `/jsonrpc`
+> endpoint.
 
-    override fun onEvent(event: FooUiEvent) = when (event) {
-        FooUiEvent.Appeared -> { /* trigger side effects on screen appear */ }
-        is FooUiEvent.ItemClicked -> sendEffect(FooUiEffect.NavigateToDetail(event.id))
-    }
-}
+### 3. Build & run
+
+```bash
+./gradlew installDebug      # build + install on a connected device/emulator
+# or
+./gradlew assembleDebug     # produce app/build/outputs/apk/debug/app-debug.apk
 ```
 
-### Screen
-```kotlin
-@Composable
-fun FooScreen(viewModel: FooViewModel = hiltViewModel(), onNavigate: (String) -> Unit) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
-
-    LaunchedEffect(Unit) { viewModel.onEvent(FooUiEvent.Appeared) }
-
-    CollectEffect(viewModel.effect) { effect ->
-        when (effect) {
-            is FooUiEffect.NavigateToDetail -> onNavigate(effect.id)
-            is FooUiEffect.ShowSnackbar -> snackbarHostState.showSnackbar(effect.message)
-        }
-    }
-    // ... Compose UI using state
-}
-```
+> **Build note:** D8 dexing can be heap-hungry on the default JVM. If a build OOMs, run
+> with a larger heap:
+>
+> ```bash
+> ./gradlew assembleDebug -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g"
+> ```
 
 ---
 
-## Adding a new feature
+## Architecture
 
-1. Create `feature/{name}/{Name}Contract.kt` — define `UiState`, `UiEvent`, `UiEffect`.
-2. Create `feature/{name}/{Name}ViewModel.kt` — extend `MviViewModel`, inject use cases.
-3. Create `feature/{name}/{Name}Screen.kt` — collect state, collect effects, render UI.
-4. Add a `composable(Routes.NAME) { ... }` entry in `AppNavHost`.
-
-## Adding a new API endpoint
-
-1. Add method to `ApiService`.
-2. Add DTO in `data/network/dto/`.
-3. Implement mapping in `ItemRepositoryImpl` (or a new repo if it's a different domain).
-4. Add a method to the repository interface + impl.
-5. Create a use case in `domain/usecase/` if it will be called from multiple ViewModels.
-
-## Adding a new Room table
-
-1. Create `data/local/entity/{Foo}Entity.kt` with `@Entity`.
-2. Create `data/local/dao/{Foo}Dao.kt` with `@Dao`.
-3. Add entity to `@Database(entities = [...])` in `AppDatabase`.
-4. **Bump `AppDatabase.VERSION`** by 1.
-5. Write a `MIGRATION_X_Y` in `Migrations.kt` and register it in `DatabaseModule`.
-6. Provide the DAO from `DatabaseModule`.
-
----
-
-## Library versions (`gradle/libs.versions.toml`)
-
-| Library | Version |
-|---|---|
-| AGP | 9.2.1 |
-| Kotlin | 2.3.20 |
-| KSP | 2.3.6 |
-| Compose BOM | 2026.03.01 |
-| Lifecycle | 2.10.0 |
-| Navigation Compose | 2.9.7 |
-| Hilt | 2.59.2 |
-| Hilt Navigation Compose | 1.3.0 |
-| Retrofit | 3.0.0 |
-| OkHttp | 5.3.2 |
-| Room | 2.8.4 |
-| DataStore | 1.2.1 |
-| Coroutines | 1.10.2 |
-
----
-
-## Folder structure
+The project follows **Clean Architecture** with three layers and the **MVI**
+(Model–View–Intent) pattern in the presentation layer. Dependencies point inward — the
+`domain` layer is pure Kotlin with no Android or framework dependencies.
 
 ```
-app/src/main/java/com/example/app/
-├── core/
-│   └── mvi/
-│       ├── MviContract.kt        ← MviUiState, MviUiEvent, MviUiEffect interfaces
-│       ├── MviViewModel.kt       ← Base ViewModel: state, effect, updateState, sendEffect
-│       └── CollectEffect.kt      ← Composable helper to collect one-time effects
-├── data/
-│   ├── di/
-│   │   ├── NetworkModule.kt      ← OkHttp, Retrofit, ApiService singletons
-│   │   ├── DatabaseModule.kt     ← Room database + DAO providers
-│   │   └── RepositoryModule.kt   ← @Binds interface → impl
-│   ├── local/
-│   │   ├── AppDatabase.kt
-│   │   ├── dao/ItemDao.kt
-│   │   ├── entity/ItemEntity.kt
-│   │   └── migration/Migrations.kt
-│   ├── network/
-│   │   ├── ApiService.kt
-│   │   └── dto/ItemDto.kt
-│   └── repository/
-│       └── ItemRepositoryImpl.kt
+┌──────────────────────────────────────────────────────────────┐
+│  PRESENTATION  (feature/*)                                     │
+│  Compose Screen  ──events──▶  ViewModel : MviViewModel         │
+│        ▲                          │  updateState / sendEffect  │
+│        └────── State / Effect ────┘                            │
+└───────────────────────────────┬──────────────────────────────┘
+                                 │ calls
+┌───────────────────────────────▼──────────────────────────────┐
+│  DOMAIN  (domain/*)            UseCases                        │
+│  Models · Repository interfaces · UseCases (business rules,    │
+│  validation) — no Android dependencies                        │
+└───────────────────────────────┬──────────────────────────────┘
+                                 │ implemented by
+┌───────────────────────────────▼──────────────────────────────┐
+│  DATA  (data/*)               RepositoryImpl                   │
+│   ├─ remote:  Retrofit OdooApiService (JSON-RPC) + DTOs        │
+│   ├─ local:   Room (TaskEntity/DAO) — cache & source of truth  │
+│   └─ prefs:   DataStore SessionDataStore (saved credentials)   │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Layer responsibilities
+
+- **Presentation (`feature/`)** — One package per feature (`auth`, `tasks`,
+  `task_detail`, `task_create`, `account`). Each has a `Contract` (State / Event /
+  Effect), a `ViewModel` (extends a small `MviViewModel` base in `core/mvi`), and a
+  Compose `Screen`. The screen renders state and emits events; the ViewModel reduces
+  events into new state and one-shot effects (navigation, snackbars).
+- **Domain (`domain/`)** — Plain Kotlin models (`Task`, `Stage`, `Project`,
+  `OdooUser`), repository **interfaces**, and **use cases** that hold the business rules
+  and input validation. This layer is framework-agnostic and the easiest to unit-test.
+- **Data (`data/`)** — Repository **implementations** that coordinate three sources:
+  - `remote/` — a single Retrofit `OdooApiService` hitting the Odoo `/jsonrpc`
+    endpoint, with DTOs mapped to domain models.
+  - `local/` — a Room database that caches tasks. Room is treated as the **single
+    source of truth**: the task list is observed as a `Flow`, so any write (refresh,
+    status update) flows straight back to the UI.
+  - `prefs/` — a DataStore (`SessionDataStore`) that persists the session
+    (database/username/password/uid) for auto-login.
+
+### Patterns & decisions
+
+- **MVI** gives each screen a single immutable state object and a unidirectional data
+  flow, which makes the UI predictable and effects (navigation/snackbars) explicit.
+- **Dependency Injection with Hilt** wires repositories, use cases, network, and
+  database across the layers without manual plumbing.
+- **Reactive cache** — the tasks screen subscribes to Room via `Flow`, so updating a
+  task's stage on the detail screen reflects on the list automatically on return.
+
+---
+
+## Libraries used
+
+| Library                                      | Why it's used                                                                                                                              |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Jetpack Compose** (+ Material 3)           | Declarative UI toolkit — the entire UI is Compose, with Material 3 components (TopAppBar, PullToRefresh, ExposedDropdownMenu, DatePicker). |
+| **Navigation Compose**                       | Type-safe, single-activity navigation between the login, list, detail, create, and account screens.                                        |
+| **Hilt** (Dagger)                            | Compile-time dependency injection. Provides ViewModels, repositories, use cases, Retrofit, and Room with minimal boilerplate.              |
+| **Retrofit** + **Gson converter**            | HTTP client for the Odoo JSON-RPC API. A single endpoint sends typed request bodies and parses dynamic responses.                          |
+| **OkHttp** + **logging-interceptor**         | Underlying HTTP engine; the logging interceptor makes JSON-RPC traffic inspectable during development.                                     |
+| **Room**                                     | Local SQLite persistence for the task cache, used as the single source of truth and exposed as Kotlin `Flow`.                              |
+| **DataStore (Preferences)**                  | Lightweight, async key-value storage for the user session/credentials (modern replacement for SharedPreferences).                          |
+| **Kotlin Coroutines / Flow**                 | Asynchronous work and reactive streams throughout (suspend functions in use cases, `Flow` from Room).                                      |
+| **AndroidX Lifecycle (ViewModel + Compose)** | Lifecycle-aware ViewModels and `collectAsStateWithLifecycle` for safe state collection in Compose.                                         |
+| **Material Icons Extended**                  | Icon set used across screens (deadline, status, navigation icons).                                                                         |
+| **JUnit / Espresso / Compose UI Test**       | Unit and instrumented testing infrastructure.                                                                                              |
+
+Versions are centralised in [gradle/libs.versions.toml](gradle/libs.versions.toml).
+
+---
+
+## Assumptions & limitations
+
+- **Offline synchronization is not implemented in this version.** Room is used as a
+  read cache and single source of truth, but there is no offline write queue or
+  conflict resolution — creating/updating tasks requires connectivity.
+- **Credentials are stored locally in DataStore** for auto-login. They are not
+  encrypted; this is acceptable for a demo/test app but would warrant
+  `EncryptedSharedPreferences`/Keystore in production.
+- **New tasks are created in the first available project**, since the UI has no project
+  picker.
+- **Stage list is filtered to shared project stages** (`user_id = false`) so per-user
+  personal Odoo stages don't appear in the status dropdown.
+- The app targets a single Odoo database/server configured at build time (overridable on
+  the login screen); multi-server switching is out of scope.
+- `minSdk = 26`, `targetSdk = 36`.
+
+---
+
+## Project structure
+
+```
+com.example.odootask
+├── core/mvi/            # MVI base classes (MviViewModel, Contract, CollectEffect)
 ├── domain/
-│   ├── model/Item.kt
-│   ├── repository/ItemRepository.kt   ← interface (no Android deps)
-│   └── usecase/GetItemsUseCase.kt
+│   ├── model/           # Task, Stage, Project, OdooUser
+│   ├── repository/      # Auth/Task/Project repository interfaces
+│   └── usecase/         # auth/* and task/* use cases (business rules + validation)
+├── data/
+│   ├── remote/          # OdooApiService + JSON-RPC DTOs
+│   ├── local/           # Room: entity, dao, database
+│   ├── prefs/           # SessionDataStore (DataStore)
+│   ├── repository/      # Repository implementations
+│   └── di/              # Hilt modules (Network, Database, Repository)
 ├── feature/
-│   └── items/
-│       ├── ItemsContract.kt      ← UiState, UiEvent, UiEffect
-│       ├── ItemsViewModel.kt
-│       └── ItemsScreen.kt
-├── ui/
-│   ├── navigation/
-│   │   ├── AppNavHost.kt
-│   │   └── Routes.kt
-│   └── theme/
-│       ├── Color.kt
-│       └── Theme.kt
-├── MainActivity.kt
-└── MyApplication.kt
+│   ├── auth/            # Login
+│   ├── tasks/           # Task list
+│   ├── task_detail/     # Update task status
+│   ├── task_create/     # Create task
+│   └── account/         # Account / logout
+└── ui/
+    ├── navigation/      # AppNavHost, Routes, SessionViewModel
+    └── theme/           # Theme, Color, Type
 ```

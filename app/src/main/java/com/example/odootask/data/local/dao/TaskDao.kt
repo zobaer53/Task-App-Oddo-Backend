@@ -29,6 +29,9 @@ interface TaskDao {
     @Query("UPDATE tasks SET stageId = :stageId, stageName = :stageName WHERE id = :id")
     suspend fun updateStage(id: Int, stageId: Int, stageName: String)
 
+    @Query("DELETE FROM tasks WHERE id = :id")
+    suspend fun deleteById(id: Int)
+
     @Query("DELETE FROM tasks")
     suspend fun clear()
 }
