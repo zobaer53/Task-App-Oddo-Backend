@@ -43,10 +43,13 @@ class ProjectRepositoryImpl @Inject constructor(
 
     override suspend fun getStages(): Result<List<Stage>> = runCatching {
         val s = requireSession()
+        // Exclude per-user personal stages (Inbox/Today/This Week/…); those carry a
+        // user_id, while the shared project stages we want have user_id = false.
+        val domain = listOf(listOf("user_id", "=", false))
         val args = listOf(
             s.database, s.uid, s.password,
             "project.task.type", "search_read",
-            listOf(emptyList<Any>()), // positional args: [domain]
+            listOf(domain), // positional args: [domain]
             mapOf("fields" to listOf("id", "name")), // kwargs
         )
         val resp = api.callJsonRpc(OdooRequest(params = ObjectParams(args = args)))

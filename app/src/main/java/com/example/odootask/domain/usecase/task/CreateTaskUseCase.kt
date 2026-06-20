@@ -9,6 +9,7 @@ class CreateTaskUseCase @Inject constructor(
     suspend operator fun invoke(
         name: String,
         projectId: Int,
+        description: String?,
         dateDeadline: String?,
         userIds: List<Int>,
     ): Result<Int> {
@@ -16,8 +17,8 @@ class CreateTaskUseCase @Inject constructor(
             return Result.failure(IllegalArgumentException("Task name is required"))
         }
         if (projectId <= 0) {
-            return Result.failure(IllegalArgumentException("A project must be selected"))
+            return Result.failure(IllegalArgumentException("No project available to create the task in"))
         }
-        return repository.createTask(name.trim(), projectId, dateDeadline, userIds)
+        return repository.createTask(name.trim(), projectId, description?.trim(), dateDeadline, userIds)
     }
 }

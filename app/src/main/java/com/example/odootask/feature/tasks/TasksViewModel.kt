@@ -5,19 +5,31 @@ import com.example.odootask.core.mvi.MviViewModel
 import com.example.odootask.domain.usecase.auth.GetSessionUseCase
 import com.example.odootask.domain.usecase.auth.LogoutUseCase
 import com.example.odootask.domain.usecase.task.GetTasksUseCase
+import com.example.odootask.domain.usecase.task.ObserveTasksUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class TasksViewModel @Inject constructor(
+    observeTasksUseCase: ObserveTasksUseCase,
     private val getTasksUseCase: GetTasksUseCase,
     private val logoutUseCase: LogoutUseCase,
     private val getSessionUseCase: GetSessionUseCase,
 ) : MviViewModel<TasksUiState, TasksUiEvent, TasksUiEffect>(TasksUiState()) {
 
     private var hasLoaded = false
+
+    init {
+        // The cache is the single source of truth: a stage update from the detail
+        // screen writes through to Room, so the matching row refreshes here on return.
+        observeTasksUseCase()
+            .onEach { tasks -> updateState { copy(tasks = tasks) } }
+            .launchIn(viewModelScope)
+    }
 
     override fun onEvent(event: TasksUiEvent) {
         when (event) {
@@ -53,9 +65,10 @@ class TasksViewModel @Inject constructor(
             else copy(isLoading = true, errorMessage = null)
         }
         viewModelScope.launch {
+            // Success updates the Room cache, which the observer above reflects into state.
             getTasksUseCase().fold(
-                onSuccess = { tasks ->
-                    updateState { copy(tasks = tasks, isLoading = false, isRefreshing = false) }
+                onSuccess = {
+                    updateState { copy(isLoading = false, isRefreshing = false) }
                 },
                 onFailure = { e ->
                     updateState { copy(isLoading = false, isRefreshing = false) }

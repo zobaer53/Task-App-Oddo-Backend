@@ -12,7 +12,9 @@ import com.example.odootask.data.remote.dto.toEntity
 import com.example.odootask.domain.model.Task
 import com.example.odootask.domain.repository.TaskRepository
 import com.google.gson.Gson
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -44,14 +46,21 @@ class TaskRepositoryImpl @Inject constructor(
         val el = resp.result ?: throw RuntimeException(resp.error?.data?.message ?: "Failed to load tasks")
 
         val entities = gson.fromJson(el, Array<TaskDto>::class.java).map { it.toEntity() }
-        taskDao.clear()
-        taskDao.upsertAll(entities)
+        taskDao.replaceAll(entities)
         entities.map { it.toDomain() }
     }
+
+    /** Reactive view of the cache; the single source of truth for the task list UI. */
+    override fun observeTasks(): Flow<List<Task>> =
+        taskDao.observeAll().map { rows -> rows.map { it.toDomain() } }
+
+    /** Reads a single task straight from the cache populated by [getTasks]. */
+    override suspend fun getTask(taskId: Int): Task? = taskDao.getById(taskId)?.toDomain()
 
     override suspend fun createTask(
         name: String,
         projectId: Int,
+        description: String?,
         dateDeadline: String?,
         userIds: List<Int>,
     ): Result<Int> = runCatching {
@@ -59,6 +68,7 @@ class TaskRepositoryImpl @Inject constructor(
         val values = buildMap<String, Any> {
             put("name", name)
             put("project_id", projectId)
+            if (!description.isNullOrBlank()) put("description", description)
             if (!dateDeadline.isNullOrBlank()) put("date_deadline", dateDeadline)
             // many2many command 4 = link an existing record (assign these users)
             if (userIds.isNotEmpty()) put("user_ids", userIds.map { listOf(4, it) })
@@ -67,20 +77,14 @@ class TaskRepositoryImpl @Inject constructor(
         val resp = api.callJsonRpc(OdooRequest(params = ObjectParams(args = args)))
         val el = resp.result ?: throw RuntimeException(resp.error?.data?.message ?: "Failed to create task")
 
-        if (el.isJsonPrimitive && el.asJsonPrimitive.isNumber) el.asInt else 0
+        val newId = if (el.isJsonPrimitive && el.asJsonPrimitive.isNumber) el.asInt else 0
+        // Pull the new row into the cache so the reactive task list shows it without a refresh.
+        if (newId > 0) cacheTask(s, newId)
+        newId
     }
 
-    override suspend fun updateTaskStage(taskId: Int, stageId: Int): Result<Unit> = runCatching {
-        val s = requireSession()
-        val writeArgs = listOf(
-            s.database, s.uid, s.password,
-            "project.task", "write",
-            listOf(listOf(taskId), mapOf("stage_id" to stageId)),
-        )
-        val resp = api.callJsonRpc(OdooRequest(params = ObjectParams(args = writeArgs)))
-        resp.result ?: throw RuntimeException(resp.error?.data?.message ?: "Failed to update stage")
-
-        // Re-read the row so the cached stage name reflects the new stage.
+    /** Reads a single `project.task` row by id and upserts it into the cache. */
+    private suspend fun cacheTask(s: SessionData, taskId: Int) {
         val readArgs = listOf(
             s.database, s.uid, s.password,
             "project.task", "read",
@@ -94,7 +98,20 @@ class TaskRepositoryImpl @Inject constructor(
                 .takeIf { it.isNotEmpty() }
                 ?.let { taskDao.upsertAll(it) }
         }
-        Unit
+    }
+
+    override suspend fun updateTaskStage(taskId: Int, stageId: Int): Result<Unit> = runCatching {
+        val s = requireSession()
+        val writeArgs = listOf(
+            s.database, s.uid, s.password,
+            "project.task", "write",
+            listOf(listOf(taskId), mapOf("stage_id" to stageId)),
+        )
+        val resp = api.callJsonRpc(OdooRequest(params = ObjectParams(args = writeArgs)))
+        resp.result ?: throw RuntimeException(resp.error?.data?.message ?: "Failed to update stage")
+
+        // Re-read the row so the cached stage name reflects the new stage.
+        cacheTask(s, taskId)
     }
 
     private suspend fun requireSession(): SessionData =
