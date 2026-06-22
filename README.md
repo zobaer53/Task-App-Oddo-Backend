@@ -19,6 +19,16 @@ setup.
 - **Update task status** — move a task between the project's shared stages.
 - **Account** — view and update the logged-in user's account name, plus logout.
 
+
+## Demo
+
+
+https://github.com/user-attachments/assets/09972392-c87c-45b1-9a7b-9e1e67d5b52d
+
+
+
+
+
 ---
 
 ## Project setup
