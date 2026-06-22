@@ -60,7 +60,7 @@ fun LoginScreen(
 }
 
 @Composable
-private fun LoginContent(
+internal fun LoginContent(
     state: LoginUiState,
     onEvent: (LoginUiEvent) -> Unit,
 ) {

@@ -76,7 +76,7 @@ fun TaskDetailScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TaskDetailContent(
+internal fun TaskDetailContent(
     state: TaskDetailUiState,
     snackbarHostState: SnackbarHostState,
     onEvent: (TaskDetailUiEvent) -> Unit,

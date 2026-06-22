@@ -93,7 +93,7 @@ fun TasksScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TasksContent(
+internal fun TasksContent(
     state: TasksUiState,
     snackbarHostState: SnackbarHostState,
     onEvent: (TasksUiEvent) -> Unit,

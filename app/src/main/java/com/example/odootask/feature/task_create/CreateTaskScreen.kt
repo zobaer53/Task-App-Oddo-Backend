@@ -77,7 +77,7 @@ fun CreateTaskScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CreateTaskContent(
+internal fun CreateTaskContent(
     state: CreateTaskUiState,
     snackbarHostState: SnackbarHostState,
     onEvent: (CreateTaskUiEvent) -> Unit,

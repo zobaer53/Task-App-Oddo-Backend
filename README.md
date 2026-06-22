@@ -155,20 +155,18 @@ Versions are centralised in [gradle/libs.versions.toml](gradle/libs.versions.tom
 
 The Clean Architecture + MVI layering makes the app highly testable: pure domain use cases,
 fakeable repository **interfaces**, ViewModels with deterministic state/effect streams, and a
-single Room DAO. The suite is built as a test pyramid — heavy on fast JVM unit tests, with a
-thin layer of instrumented Room + Compose UI tests on top.
+single Room DAO. The suite is built as a test pyramid — heavy on fast JVM unit tests (≈94), with
+a thin layer of instrumented Room + Compose UI tests on top (≈39).
 
-| Layer                           | Source set         | Tooling                                  |
-| ------------------------------- | ------------------ | ---------------------------------------- |
-| Domain use cases · DTO mappers  | `src/test` (JVM)   | JUnit, Truth, MockK                      |
-| ViewModel (MVI) state/effects   | `src/test` (JVM)   | Turbine, coroutines-test, `MainDispatcherRule` |
-| Room DAO                        | `src/androidTest`  | room-testing (in-memory DB)              |
-| Compose UI · navigation / E2E   | `src/androidTest`  | Compose UI Test, Hilt-android-testing    |
+| Layer                          | Source set        | Tests | Tooling                                        |
+| ------------------------------ | ----------------- | ----- | ---------------------------------------------- |
+| Domain use cases               | `src/test` (JVM)  | 26    | JUnit, Truth                                   |
+| DTO ⇄ Entity ⇄ Domain mappers  | `src/test` (JVM)  | 8     | JUnit, Truth, real Gson                        |
+| Repository arg-building        | `src/test` (JVM)  | 19    | JUnit, Truth, MockK                            |
+| ViewModel (MVI) state/effects  | `src/test` (JVM)  | 40    | Turbine, coroutines-test, `MainDispatcherRule` |
+| Room DAO                       | `src/androidTest` | 8     | room-testing (in-memory DB)                    |
+| Compose UI (per screen)        | `src/androidTest` | 31    | Compose UI Test                                |
 
-Shared test infrastructure lives in `src/test/.../util/` — a `MainDispatcherRule` (swaps
-`Dispatchers.Main` for a `StandardTestDispatcher`), domain-model **builders**, and hand-written
-**fakes** of the three repository interfaces, reused across the unit-test suites. Hilt-backed
-instrumented tests run via a custom `HiltTestRunner` (`HiltTestApplication`).
 
 ```bash
 ./gradlew :app:testDebugUnitTest            # fast JVM unit tests
@@ -221,7 +219,15 @@ com.example.odootask
     └── theme/           # Theme, Color, Type
 
 src/test/com.example.odootask/        # JVM unit tests
-└── util/                # MainDispatcherRule, builders, repository fakes
+├── domain/usecase/      # use-case validation + delegation
+├── data/remote/dto/     # DTO → Entity mapper (Odoo many2one/false quirk)
+├── data/local/entity/   # Entity → Domain mapper
+├── data/repository/     # JSON-RPC arg-building (MockK)
+├── feature/             # ViewModel (MVI) state + effect tests
+├── ui/navigation/       # SessionViewModel
+└── util/                # MainDispatcherRule, builders, repository fakes, OdooRpc
 src/androidTest/com.example.odootask/ # instrumented tests
+├── data/local/dao/      # Room DAO (in-memory DB)
+├── feature/             # Compose UI tests (per screen)
 └── util/                # HiltTestRunner
 ```

@@ -55,6 +55,21 @@ android {
         compose = true
         buildConfig = true
     }
+
+    packaging {
+        resources {
+            // mockk pulls in junit5 transitively; drop its duplicate license/notice files
+            // so the androidTest APK merges cleanly.
+            excludes += setOf(
+                "META-INF/LICENSE.md",
+                "META-INF/LICENSE-notice.md",
+                "META-INF/LICENSE*",
+                "META-INF/NOTICE*",
+                "META-INF/AL2.0",
+                "META-INF/LGPL2.1",
+            )
+        }
+    }
 }
 
 // Room schema export directory
